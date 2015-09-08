@@ -2157,15 +2157,15 @@ CHECK_UPDATE() {
 			echo "Your git version: $GITVERSION"
 			echo "Required git version: $NEEDEDGIT"
 			echo "Auto-update feature has been disabled, please update your git to latest version"
-			PRESS_ENTER
+			read -p "Press Enter To Continue"
 			return 0
 		fi
-		echo "Checking network connection..."
+		echo "Checking connection..."
 		if [[ "$(wget --spider github.com >/dev/null 2>&1; echo $?)" -ne 0 ]]; then
 			echo
 			echo "WARNING: Could not connect to github.com, probably your network is down"
 			echo "Auto-update feature has been disabled"
-			PRESS_ENTER
+			read -p "Press Enter To Continue"
 			return 0
 		fi
 		local REPO="origin"
@@ -2173,13 +2173,13 @@ CHECK_UPDATE() {
 		local CURBRANCH="$(git rev-parse --abbrev-ref HEAD)"
 		if [[ "$CURBRANCH" != "$GITHUBBRANCH" ]]; then
 			echo "You're currently using $CURBRANCH branch, and this is not the default $GITHUBBRANCH branch. Auto-update feature has been disabled"
-			PRESS_ENTER
+			read -p "Press Enter To Continue"
 			return 0
 		fi
 		if [[ "$(git remote | grep -qi "$REPO"; echo $?)" -ne 0 ]]; then
 			git remote add -t "$GITHUBBRANCH" -m "$GITHUBBRANCH" "$REPO" "$GITHUBLINK"
 		fi
-		echo "Fetching current version..."
+		echo "Retreive current version..."
 		git fetch -q "$REPO" "$GITHUBBRANCH"
 		local HEAD="$(git rev-parse "$REPO/$GITHUBBRANCH")"
 		if [[ ! -z "$HEAD" && "$OLDHEAD" != "$HEAD" ]]; then
@@ -2190,8 +2190,8 @@ CHECK_UPDATE() {
 			echo # Beacause git log doesn't finish with newline
 			echo "=========="
 			git pull -q "$REPO" "$GITHUBBRANCH" >/dev/null 2>&1 || (echo; echo "WARNING: Bongs Kitchen could not apply update due to conflicts, forced update mode will be used now. Please make proper backups if you need any of your past projects before going to the next step"; PRESS_ENTER; git reset -q --hard; git clean -qfd; git pull -q "$REPO" "$GITHUBBRANCH")
-			echo "ArchiKitchen has been updated, it will now restart itself"
-			PRESS_ENTER
+			echo "Bongs Multi Kitchen has been updated, it will now attempt to restart itself"
+			read -p "Press Enter To Continue"
 			exec "$0"
 		else
 			echo "No new updates found"
