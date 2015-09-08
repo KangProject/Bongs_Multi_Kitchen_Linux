@@ -80,7 +80,10 @@ echo -n "   Enter option: "
 		2) DEODEX_START_MENU;;
 		00) EXIT_OUT;;
 		dg|DG|dG|Dg) BASIC_DEO_GUIDE;;
-		3) ROM_MAIN_MENU;; 
+		3) echo "Not Set By Developer Yet..: '$opt'"
+			sleep 1s
+			BASE_MENU
+		;; 
 		99) clear; EXIT_OUT;;
 		*)
 			echo "Unknown command: '$opt'"
