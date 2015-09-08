@@ -43,7 +43,7 @@ ALIGN=4
 GITHUBLINK="https://github.com/Carloss32/Bongs_Multi_Kitchen_Linux.git"
 AUTOUPDATE="1" # Defines if we should turn on auto updates, if available
 GITHUBBRANCH="master"
-NEEDEDGIT="1.8"
+NEEDEDGIT="1.9"
 
 
 BASE_MENU() {
@@ -98,18 +98,6 @@ done
 #
 #                                                    Bongs Rom Tools Below
 #####################################################################################
-
-# Compares two versions
-VERSION_LESS_THAN() {
-	# $1 - Input version
-	# $2 - Compared version
-	# Returns true if $1 < $2, false otherwise
-	if [[ "$1" != "$2" && "$(echo -e "$1\n$2" | sort -V | head -n 1)" = "$1" ]]; then
-		return 0
-	else
-		return 1
-	fi
-}
 
 
 
@@ -2144,6 +2132,18 @@ SWITCH_C() {
 		done
 		decompile=$decom
 		cd $APKKITCH
+}
+
+## Compares Git versions ##
+VERSION_LESS_THAN() {
+	# $1 - Input version
+	# $2 - Compared version
+	# Returns true if $1 < $2, false otherwise
+	if [[ "$1" != "$2" && "$(echo -e "$1\n$2" | sort -V | head -n 1)" = "$1" ]]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 ## Auto-update feature of Bongs Kitchen ##
