@@ -1,5 +1,7 @@
 APK_Kitchen/editing/*
+APK_Kitchen/edited_output_files/*
 APK_Kitchen/place_input_file_here/*
 APK_Kitchen/place_apk_here_to_sign/*
 APK_Kitchen/batch_optimize/*
 tools/framework/*
+tools/logs/*
