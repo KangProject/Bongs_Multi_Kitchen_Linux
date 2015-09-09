@@ -3,6 +3,7 @@
 Basic User Giude For Linux Version..
 
 First Steps..
+
 Download from one of available sources or cloned git
 Extract ( anywhere should be fine just make sure to keep file\folder structure and that there are no spaces in name )
 if you have cloned git repo the file should already be executable if its not then
@@ -12,12 +13,14 @@ open Bong_Kitchen folder and double click Main ( click run in terminal )
 Kitchen Should now be setup for use....
 
 Main Options Menu..
+
 At the first menu you will be given a choice to choose between the tools within the kitchen.
 Option 1 Will Take you to APK Kitchen
 Option 2 Will take you to the Lollipop Deodexer
 Option 3 Will take you to the Rom Creation Tools ( Not Implimented Yet.. )
 
 APK Kitchen Guide..
+
 on first run of the APK Kitchen it will take you to the setup page to set the folders needed,
 and pull framework files from phone option
 you can then install you framework files from there, there are all stored within Bongs_Kitchen/tools/framework/apktoolversion
@@ -34,6 +37,7 @@ to do some basic edits but then want to do some smali edits without having to do
 full decompile again and overwrite/loose there already edited files.
 
 Lollipop Deodexer Guide..
+
 First step is to copy your full rom folder over into the main kitchen folder. ( Ensure there are no spaces in folder name )
 Start Bongs Multi Kitchen ( Double Click Main )
 Select option 2 at first menu to goto the Deodexer menu
@@ -44,4 +48,5 @@ Sit back and wait for it to finish
 Test the rom on your phone.
 
 Rom Tools Guide..
+
 Not intergrated by developer yet..
