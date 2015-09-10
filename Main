@@ -232,19 +232,60 @@ MOUNT_IMG() {
 
 ## Creates new Build ##
 CREATE_NEW_BUILD() {
-	PRINT_BANNER
+	clear
 	echo "Before you begin, you must specify what kind of the project you want to create"
 	echo
 	echo "   1 Create a ZIP-flashable ROM from stock partition image(s)"
+	echo "   2 Create a ZIP-flashable ROM from stock .tar file"
+	echo "   3 Create a ZIP-flashable ROM from stock .md5 file"
 	echo
 	echo -n "   Enter option: "
 	 read opt
 	    case $opt in
 		1) NEW_BUILD_STOCK;;
+		2) NEW_BUILD_TAR;;
+		3) NEW_BUILD_MD5;;
 		*)
 			echo "Unknown command: '$opt'"
 		;;
      esac
+}
+
+## Extracts files from stock .md5 file for use ##
+NEW_BUILD_MD5() {
+cd $RKITCH/base_files
+clear
+echo "Select Stock.md5.."
+		PS3="Number:"
+		md5filearr=`ls -d  *.md5 `
+		select md5file in $md5filearr
+		do
+			break
+		done
+		MD5=$md5file
+		
+tar xvf $MD5
+
+read -p " Extraction Completed Press ENTER to Continue."
+NEW_BUILD_STOCK
+}
+
+## Extracts files from stock .jar file for use ##
+NEW_BUILD_TAR() {
+cd $RKITCH/base_files
+clear
+echo "Select Stock.tar.."
+		PS3="Number:"
+		tarfilearr=`ls -d  *.tar `
+		select tarfile in $tarfilearr
+		do
+			break
+		done
+		TAR=$tarfile
+tar xvf $TAR
+
+read -p " Extraction Completed Press ENTER to Continue."
+NEW_BUILD_STOCK
 }
 
 ## Creates a new build from a stock image ##
