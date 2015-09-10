@@ -40,6 +40,7 @@ logs=$current/tools/logs
 oat2dex=$TOOLSDIR/oat2dex/oat2dex.jar
 ## Rom Kitchen Initial variables ##
 RKITCH=$current/Rom_Kitchen
+DEVICES=$current/tools/devices
 TOOLS=(which whoami basename dirname gcc java perl sed cut wget od wc cpio zip unzip tar)
 TEMPDIR="$RKITCH/TEMP"
 ACTIVE_BUILD=""
@@ -55,6 +56,20 @@ UPDATER_SCRIPT_USER="updater-script-85_USER" # Unused
 UPDATER_SCRIPT_KERNEL="updater-script-90_KERNEL"
 UPDATER_SCRIPT_MODEM="updater-script-91_MODEM"
 UPDATER_SCRIPT_TAIL="updater-script-99_TAIL" # Unused
+
+## Obtains Root Permission For Kitchen ##
+OBTAIN_ROOT() {
+	if [[ "$CUSER" = "root" ]]; then
+		$@ # Yes, we must break on spaces in this case
+	else
+		echo "Root access is required! attempting sudo $@"
+		if [[ ! -z "$(which sudo)" ]]; then
+			sudo $@ # Yes, we must break on spaces in this case
+		else
+			su -c $@ # Yes, we must break on spaces in this case
+		fi
+	fi
+}
 
 
 BASE_MENU() {
@@ -118,7 +133,7 @@ echo -e "   ----------------------------------         -------------------------
 echo -e "   Project Selections..                       Compile and finalise options..                            Variables"
 echo -e "   ----------------------------------         ------------------------------------                      -----------------"
 echo -e "                                                                                                        Rom State:\e[1m$rmstate\e[0m"
-echo -e "   1    Set New Project                       2    Select Exsisting Project                             Current Project:\e[1m$ACTIVE_BUILD\e[0m"
+echo -e "   1    Create New Build                      2    Select Exsisting Project                             Current Project:\e[1m$ACTIVE_BUILD\e[0m"
 echo -e "                                                                                                        Rom Device: \e[1m$DevT\e[0m"
 echo -e "   3    Enable/Disable Root                   7    Bloat/Debloat ROM                                    Knox State: \e[1m$knoxst\e[0m"
 echo -e "                                                                                                        Root State: \e[1m\e[0m"
@@ -151,22 +166,217 @@ echo -e "   -----------------"
 echo -e "   Build Options."
 echo -e "   -----------------"
 echo -e "   15  Build ROM (normal suggested mode)"
-echo -e "   16  Build ROM (expert mode, won't perform any checks on your project ( CAUCTION!! ))                                 99   Close"
+echo -e "   16  Build ROM (expert mode, won't perform any checks on your project ( CAUTION!! ))                                 99   Close"
 echo -e ""
 echo -e "   -------------------------------------------------------------------------------------------------------------------------------------------------"
 echo -n "   Enter option: "
   read opt
     case $opt in
+		1) CREATE_NEW_BUILD;;
+		2) SELECT_OLD_BUILD;;
 		MM|mm) BASE_MENU;;
 		99) clear; EXIT_OUT;;
 		*)
 			echo "Unknown command: '$opt'"
+			sleep 1s
 		;;
     esac
 done
 }
 
-# Prints status of the project
+## Tries to mount chosen file ##
+MOUNT_IMG() {
+	# $1 - File to mount
+	# $2 - Directory to mount file into
+	echo "Mounting $(basename "$1")"
+	OBTAIN_ROOT "modprobe loop"
+	mkdir -p "$2"
+	echo "Stage 1: Mounting with automatic filesystem..."
+	OBTAIN_ROOT "mount -t auto -o loop $1 $2"
+	if [[ $? -eq 0 ]]; then
+		echo "Mounted!"
+		return 0
+	fi
+	echo "Not Mountable!"
+	OBTAIN_ROOT "umount $2"
+	echo "Stage 2: Checking if image is in ext4 format for converting..."
+	if [[ "$(od -A n -h -N 5 "$1" | sed 's/ //g')" = "ff3aed260001" ]]; then
+		echo "image is ext4 format!"
+		if [[ ! -x "$TEMPDIR/simg2img" ]]; then
+			echo "Compiling simg2img..."
+			gcc -O2 "$TOOLSDIR/simg2img/sparse_crc32.c" "$TOOLSDIR/simg2img/simg2img.c" -o "$TEMPDIR/simg2img"
+		fi
+		echo "Converting ext4 image to image..."
+		$TEMPDIR/simg2img "$1" "$1".simg2img
+		if [[ $? -ne 0 ]]; then
+			echo "Failed to convert!!"
+			read -p "Press ENTER to continue"
+		else
+			mv -f "$1".simg2img "$1"
+			echo "Mounting image..."
+			OBTAIN_ROOT "mount -t auto -o loop $1 $2"
+			if [[ $? -eq 0 ]]; then
+				echo "File Converted and Mounted!"
+				return 0
+			fi
+		fi
+		echo "Failed!"
+	else
+		echo "Is not ext4 file format"
+	fi
+	echo "Sorry, all stages failed, we're not able to extract files from this image in any implemented way"
+	echo "Either it's not a valid partition image, or we don't know how to mount it"
+	read -p "Press ENTER to continue"
+	return 1
+}
+
+## Creates new Build ##
+CREATE_NEW_BUILD() {
+	PRINT_BANNER
+	echo "Before you begin, you must specify what kind of the project you want to create"
+	echo
+	echo "   1 Create a ZIP-flashable ROM from stock partition image(s)"
+	echo
+	echo -n "   Enter option: "
+	 read opt
+	    case $opt in
+		1) NEW_BUILD_STOCK;;
+		*)
+			echo "Unknown command: '$opt'"
+		;;
+     esac
+}
+
+## Creates a new build from a stock image ##
+NEW_BUILD_STOCK() {
+cd $RKITCH/base_files
+	echo "To create a ROM from stock partition images, make sure that you have:"
+	echo
+	echo "[REQUIRED] system.img - Partition image for /system partition"
+	echo "[REQUIRED] boot.img - Raw kernel image for boot block"
+	echo "[OPTIONAL] cache.img - Partition image for /cache partition"
+	echo "[OPTIONAL] modem.bin - Raw modem image for modem block"
+	echo
+	echo "Please notice that some ROMs may have other requirements, for example having cache.img as mandatory and not optional"
+
+	local BASEFILES=0
+	while [[ $BASEFILES -eq 0 ]]; do
+		echo "Select Stock System.img.."
+		PS3="Number:"
+		systemimgarr=`ls -d  *system* `
+		select systemimg in $systemimgarr
+		do
+			break
+		done
+		SYSTEM=$systemimg
+		
+		echo "Select Stock Boot.img.."
+		PS3="Number:"
+		bootimgarr=`ls -d  *boot* `
+		select bootimg in $bootimgarr
+		do
+			break
+		done
+		BOOT=$bootimg
+		
+		echo "Select Stock Cache.img.."
+		PS3="Number:"
+		cacheimgarr=`ls -d  *cache* `
+		select cacheimg in $cacheimgarr
+		do
+			break
+		done
+		CACHE=$cacheimg
+		
+		echo "Select Stock Modem.img.."
+		PS3="Number:"
+		modemimgarr=`ls -d  *modem* `
+		select modemimg in $modemimgarr
+		do
+			break
+		done
+		MODEM=$modemimg
+
+		if [[ -f "$SYSTEM" && -f "$BOOT" ]] && ([[ -z "$CACHE" || -f "$CACHE" ]]) && ([[ -z "$MODEM" || -f "$MODEM" ]]); then
+			BASEFILES=1
+		else
+			echo "Missing files please try again."
+			read -p "Press ENTER to continue"
+		fi
+	done
+
+	## Create Build Folders ##
+	ACTIVE_BUILD="BUILD_$(date '+%d%m%y_%H%M%S')"
+	echo "Creating $ACTIVE_BUILD"
+	mkdir -p "$RKITCH/$ACTIVE_BUILD/system"
+
+	## KERNEL ##
+	cp "$BOOT" "$RKITCH/$ACTIVE_BUILD/boot.img"
+
+	## SYSTEM ##
+	cp "$SYSTEM" "$RKITCH/$ACTIVE_BUILD/system.img"
+	MOUNT_IMG "$RKITCH/$ACTIVE_BUILD/system.img" "/tmp/BongsMultiKitchenLOOP" || (DEL_PROJECT; return 1)
+	echo "Extracting everything from mounted system partition..."
+	OBTAIN_ROOT "cp -R /tmp/BongsMultiKitchenLOOP/* $RKITCH/$ACTIVE_BUILD/system/"
+	OBTAIN_ROOT "umount /tmp/BongsMultiKitchenLOOP"
+	rm -f "$RKITCH/$ACTIVE_BUILD/system.img"
+
+	## CACHE ##
+	if [[ ! -z "$CACHE" ]]; then
+		cp "$CACHE" "$RKITCH/$ACTIVE_BUILD/cache.img"
+		MOUNT_IMG "$RKITCH/$ACTIVE_BUILD/cache.img" "/tmp/BongsMultiKitchenLOOP"
+		if [[ -f "/tmp/BongsMultiKitchenLOOP/recovery/sec_csc.zip" ]]; then
+			echo "Found Samsung sec_csc file, extracting it and merging with $ACTIVE_BUILD"
+			OBTAIN_ROOT "unzip -q /tmp/BongsMultiKitchenLOOP/recovery/sec_csc.zip -d $RKITCH/$ACTIVE_BUILD/"
+		else
+			echo "Could not detect cache format"
+			echo "This is typical when cache doesn't contain any valuable files, such as sec_csc.zip in case of Samsung ROMs"
+			echo "Extract everything you need from /tmp/BongsMultiKitchenLOOP before going to the next step"
+			read -p "Press ENTER to continue"
+		fi
+		OBTAIN_ROOT "umount /tmp/BongsMultiKitchenLOOP"
+		rm -f "$RKITCH/$ACTIVE_BUILD/cache.img"
+	fi
+
+	## MODEM ##
+	if [[ ! -z "$MODEM" ]]; then
+		cp "$MODEM" "$RKITCH/$ACTIVE_BUILD/modem.bin"
+	fi
+
+	## Fix builds permissions ##
+	OBTAIN_ROOT "chown -hR $CUSER.$CUSER $RKITCH/$ACTIVE_BUILD"
+	OBTAIN_ROOT "chmod -R 755 $RKITCH/$ACTIVE_BUILD"
+
+	## Generate required files ##
+	rm -rf "$RKITCH/$ACTIVE_BUILD/META-INF" # In case we have any bloat from sec_csc.zip or similar
+	BUILD_META_INF
+	read -p "Press ENTER to continue"
+cd $RKITCH
+}
+
+## Sets old project as active one ##
+SELECT_OLD_BUILD() {
+cd $RKITCH
+	echo "Select Exsisting Build To Edit.."
+		PS3="Number:"
+		buildfoldarr=`ls -d  BUILD_* `
+		select exbuild in $buildfoldarr
+		do
+			break
+		done
+		ACTIVE_BUILD=$exbuild
+}
+
+## Creates generic META-INF ##
+BUILD_META_INF() {
+	mkdir -p "$RKITCH/$ACTIVE_BUILD/$META_INF"
+	cp $DEVICES/base-meta/update-binary "$RKITCH/$ACTIVE_BUILD/$META_INF/update-binary"
+	for UPDATER_SCRIPT in "$DEVICES/base-meta/updater-scripts/"*; do
+		cp "$UPDATER_SCRIPT" "$RKITCH/$ACTIVE_BUILD/$META_INF/"
+	done
+}
+
+## Prints status of the Build ##
 PRINT_ROM_BUILD_STATUS() {
 if [[ -z "$ACTIVE_BUILD" ]]; then
 	WARN=0
@@ -174,7 +384,7 @@ if [[ -z "$ACTIVE_BUILD" ]]; then
 else
 	WARN=1
 	if [[ -d "$RKITCH/$ACTIVE_BUILD/kernel" ]]; then
-		ALLFINE=0
+		WARN=0
 		export kernwar=" \e[93mExtracted kernel found, Please rebuild to continue.\e[0m "
 		else
 		export kernwar=""
@@ -206,7 +416,7 @@ fi
 #####################################################################################
 
 
-
+## Select Base Folder To Deodex ##
 DEODEX_ROM_BASE_FOLDER() {
 printf "%s" "Please input rom base folder name: "
 read rombase
@@ -227,6 +437,7 @@ else
 fi
 }
 
+## Deodex Main Menu ##
 DEODEX_START_MENU() {
 while :; do
 clear
@@ -270,6 +481,7 @@ echo -n "   Enter option: "
 done
 }
 
+## Architecture Type Test ##
 ARCH_TEST() {
 if [ -z "$rombase" ]; then
 arch=""
@@ -314,6 +526,7 @@ elif [[ $x86arch = "x86" && -f $framfol/$x86arch/boot.oat ]]; then
 fi
 }
 
+## Doedex What?? ##
 DEODEX_SEL_MENU() {
 clear
 while :; do
@@ -348,6 +561,8 @@ read INPUT
 	fi
 done
 }
+
+## Open Guide To Doedexer ##
 BASIC_DEO_GUIDE() {
 clear
 cat $current/tools/guides/Deodexer_Guide.txt
@@ -373,6 +588,7 @@ sleep 2s
 DEODEX_SEL_MENU
 }
 
+## Do Full System Deodex ##
 DO_FULL_SYS() {
 
 clear
