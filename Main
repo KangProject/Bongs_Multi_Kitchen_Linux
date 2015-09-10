@@ -257,7 +257,7 @@ cd $RKITCH/base_files
 clear
 echo "Select Stock.md5.."
 		PS3="Number:"
-		md5filearr=`ls -d  *.md5 `
+		if md5filearr=`ls -d  *.md5 `; then
 		select md5file in $md5filearr
 		do
 			break
@@ -268,6 +268,11 @@ tar xvf $MD5
 
 read -p " Extraction Completed Press ENTER to Continue."
 NEW_BUILD_STOCK
+else
+echo "No md5 files present in base_file folder"
+sleep 3s
+CREATE_NEW_BUILD
+fi
 }
 
 ## Extracts files from stock .jar file for use ##
@@ -276,7 +281,7 @@ cd $RKITCH/base_files
 clear
 echo "Select Stock.tar.."
 		PS3="Number:"
-		tarfilearr=`ls -d  *.tar `
+		if tarfilearr=`ls -d  *.tar `; then
 		select tarfile in $tarfilearr
 		do
 			break
@@ -286,11 +291,17 @@ tar xvf $TAR
 
 read -p " Extraction Completed Press ENTER to Continue."
 NEW_BUILD_STOCK
+else
+echo "No tar files present in base_file folder"
+sleep 3s
+CREATE_NEW_BUILD
+fi
 }
 
 ## Creates a new build from a stock image ##
 NEW_BUILD_STOCK() {
 cd $RKITCH/base_files
+clear
 	echo "To create a ROM from stock partition images, make sure that you have:"
 	echo
 	echo "[REQUIRED] system.img - Partition image for /system partition"
@@ -2497,7 +2508,7 @@ CHECK_UPDATE() {
 			git --no-pager log --abbrev-commit --decorate --date=relative --pretty=format:'%C(bold red)%h%Creset %C(bold green)(%cr)%Creset - %C(bold yellow)%s%Creset %C(bold blue)commited by%Creset %C(bold cyan)%an%Creset' "$OLDHEAD..$HEAD"
 			echo # Beacause git log doesn't finish with newline
 			echo "=========="
-			git pull -q "$REPO" "$GITHUBBRANCH" >/dev/null 2>&1 || (echo; echo "WARNING: Bongs Kitchen could not apply update due to conflicts, forced update mode will be used now. Please make proper backups if you need any of your past projects before going to the next step"; PRESS_ENTER; git reset -q --hard; git clean -qfd; git pull -q "$REPO" "$GITHUBBRANCH")
+			git pull -q "$REPO" "$GITHUBBRANCH" >/dev/null 2>&1 || (echo; echo "WARNING: Bongs Kitchen could not apply update due to conflicts, forced update mode will be used now. Please make proper backups if you need any of your past projects before going to the next step"; read -p "Press Enter To Continue"; git reset -q --hard; git clean -qfd; git pull -q "$REPO" "$GITHUBBRANCH")
 			echo "Bongs Multi Kitchen has been updated, it will now attempt to restart itself"
 			read -p "Press Enter To Continue"
 			exec "$0"
