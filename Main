@@ -111,6 +111,7 @@ done
 ROM_MAIN_MENU() {
 while :; do
 clear
+PRINT_ROM_BUILD_STATUS
 echo -e "   -------------------------------------------------------------------------------------------------------------------------------------------------"
 echo -e "   MM. To Main Menu                               \e[93mBONGS ROM KITCHEN\e[0m                       "
 echo -e "   ----------------------------------         ------------------------------------                      -----------------"
@@ -150,7 +151,7 @@ echo -e "   -----------------"
 echo -e "   Build Options."
 echo -e "   -----------------"
 echo -e "   15  Build ROM (normal suggested mode)"
-echo -e "   16  Build ROM (expert mode, won't perform any checks on your project is OK)                                 99   Close"
+echo -e "   16  Build ROM (expert mode, won't perform any checks on your project ( CAUCTION!! ))                                 99   Close"
 echo -e ""
 echo -e "   -------------------------------------------------------------------------------------------------------------------------------------------------"
 echo -n "   Enter option: "
@@ -164,6 +165,40 @@ echo -n "   Enter option: "
     esac
 done
 }
+
+# Prints status of the project
+PRINT_ROM_BUILD_STATUS() {
+if [[ -z "$ACTIVE_BUILD" ]]; then
+	WARN=0
+	export rmstate=" No Build Selected"
+else
+	WARN=1
+	if [[ -d "$RKITCH/$ACTIVE_BUILD/kernel" ]]; then
+		ALLFINE=0
+		export kernwar=" \e[93mExtracted kernel found, Please rebuild to continue.\e[0m "
+		else
+		export kernwar=""
+	fi
+	if [[ ! -f "$RKITCH/$ACTIVE_BUILD/boot.img" ]]; then
+		WARN=0
+		export bootimgwar=" \e[93mNo boot.img found, ROM will not boot properly without, Ignore warning if adding later or using custom.\e[0m "
+		else
+		export bootimgwar=""
+	fi
+	if [[ ! -d "$RKITCH/$ACTIVE_BUILD/META-INF" ]]; then
+		WARN=0
+		export metawar=" \e[93mNo META-INF folder found, this is not a Rom build folder\e[0m "
+		else
+		export metawar=""
+	fi
+	if [[ "$WARN" -eq 1 ]]; then
+		export rmstate="Rom OK To Build"
+	else
+		export rmstate="ERROR!! In Rom Check Warnings"
+	fi
+fi
+}
+
 
 #####################################################################################
 #
@@ -2259,7 +2294,7 @@ fi
 
 ## Create our required directories ##
 DIR_CHCK() {
-if [ -e "$APKKITCH" ]  && [ -e "$RKITCH" ] 
+if [ -e "$APKKITCH" ] && [ -e "$RKITCH" ] 
 	then
 		BASE_MENU
 	else
