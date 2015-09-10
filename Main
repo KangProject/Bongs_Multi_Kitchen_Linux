@@ -749,18 +749,7 @@ echo "*  Goes to JF for of course, smali/baksmali tools                         
 echo "*  Goes to iBotPeaches for his updates to Brut.all awesome tool.                      *"
 echo "***************************************************************************************"
 sleep 5s
-	if [ -e "$APKKITCH/editing" ] 
-	then
-		MAIN_MENU
-	else
-	echo "This is either the first time you have run"
-	sleep 1s
-	echo "Bongs APK Kitchen or you have deleted vital"
-	sleep 1s
-	echo "folders, you will now be taken to the setup menu."
-	sleep 1s
-		MAIN_SETUP
-	fi
+	MAIN_MENU
 }
 
 ## Main Menu ##
@@ -2269,6 +2258,18 @@ else
 fi
 
 ## Create our required directories ##
+DIR_CHCK() {
+if [ -e "$APKKITCH" ]  && [ -e "$RKITCH" ] 
+	then
+		BASE_MENU
+	else
+clear
+echo "This is either the first time you have run"
+sleep 1s
+echo "Bongs Multi Kitchen or you have deleted vital"
+sleep 1s
+echo "folders, folder structure will now be rebuilt."
+sleep 1s
 mkdir -p "$APKKITCH"
 mkdir -p "$RKITCH"
 mkdir -p "$TEMPDIR"
@@ -2277,6 +2278,10 @@ mkdir -p "$APKKITCH/place_input_file_here"
 mkdir -p "$APKKITCH/place_apk_here_to_sign"
 mkdir -p "$APKKITCH/batch_optimize"
 mkdir -p "$RKITCH/base_files"
+fi
+read -p "Folder structure set, Press enter to continue.."
+BASE_MENU
+}
 
 ## Test for Tools And Throw Error If Any Missing ##
 ERROR="0"
@@ -2330,7 +2335,7 @@ PRINT_BANNER
 sleep 2s
 echo "Loading complete... Welcome to the Kitchen $CUSER"
 sleep 2s
-BASE_MENU
+DIR_CHCK
 
 # Failsafe Exit
 echo "Script Did not start correctly and will now exit please issue a bug report"
