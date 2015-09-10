@@ -4,7 +4,7 @@ Basic User Giude For Linux Version..
 
 First Steps..
 
-Download from one of available sources or cloned git
+Download from one of available sources or cloned git ( Caution with git clone, it may be the most up to date version of the Multi Kitchen but it is also possibly the most unstable as this is where i backup code after my linux ate itself and i lost everything last time.. )
 Extract ( anywhere should be fine just make sure to keep file\folder structure and that there are no spaces in name )
 if you have cloned git repo the file should already be executable if its not then
 use terminal to navigate to extracted Bongs_Kitchen folder
