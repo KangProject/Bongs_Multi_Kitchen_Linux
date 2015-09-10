@@ -42,7 +42,7 @@ oat2dex=$TOOLSDIR/oat2dex/oat2dex.jar
 RKITCH=$current/Rom_Kitchen
 TOOLS=(which whoami basename dirname gcc java perl sed cut wget od wc cpio zip unzip tar)
 TEMPDIR="$RKITCH/TEMP"
-ACTIVE_PROJECT=""
+ACTIVE_BUILD=""
 ALIGN=4
 CBIN="" # Ramdisk compression method
 DBIN="" # Ramdisk decompression method
@@ -117,7 +117,7 @@ echo -e "   ----------------------------------         -------------------------
 echo -e "   Project Selections..                       Compile and finalise options..                            Variables"
 echo -e "   ----------------------------------         ------------------------------------                      -----------------"
 echo -e "                                                                                                        Rom State:\e[1m$rmstate\e[0m"
-echo -e "   1    Set New Project                       2    Select Exsisting Project                             Current Project:\e[1m$ACTIVE_PROJECT\e[0m"
+echo -e "   1    Set New Project                       2    Select Exsisting Project                             Current Project:\e[1m$ACTIVE_BUILD\e[0m"
 echo -e "                                                                                                        Rom Device: \e[1m$DevT\e[0m"
 echo -e "   3    Enable/Disable Root                   7    Bloat/Debloat ROM                                    Knox State: \e[1m$knoxst\e[0m"
 echo -e "                                                                                                        Root State: \e[1m\e[0m"
@@ -131,13 +131,13 @@ echo -e "   -----------------"
 echo -e "   Kernel Options."
 echo -e "   -----------------"
 echo -e 
-if [[ -d "$RKITCH/$ACTIVE_PROJECT/kernel/boot.img-ramdisk" ]]; then
+if [[ -d "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk" ]]; then
 		echo -e "   11    Rebuild kernel (save all changes to ramdisk)"
 		echo -e "   12    Abort Rebuild (cancels all changes to ramdisk)"
 		echo -e
 		echo -e "   13    Add Init.d Support ( kernel hook )"
 		echo -e "   14    Enable\Disable insecure ADB"
-	elif [[ -f "$RKITCH/$ACTIVE_PROJECT/boot.img" ]]; then
+	elif [[ -f "$RKITCH/$ACTIVE_BUILD/boot.img" ]]; then
 		echo -e "   10    Extract kernel (this will show more kernel options!)"
 	fi
 echo -e "   ------------------"
@@ -869,12 +869,6 @@ echo "*    be in your tools\framework folder ready to install.                  
 echo "*                                                                                 *"
 echo "***********************************************************************************"
 echo "*                                                                                 *"
-echo "* 2. Setup Working Folders                                                        *"
-echo "*    This will setup the appropriate folder structure needed to run the           *"
-echo "*    Kitchen, This hould only ever need to be done on first run of the Kitchen    *"
-echo "*                                                                                 *"
-echo "***********************************************************************************"
-echo "*                                                                                 *"
 echo "*  3   Read Log                                                                   *"
 echo "*  4   Tool Versions / General Tips                                               *"
 echo "*  10  Main Menu                                                                  *"
@@ -884,50 +878,12 @@ echo -n "Enter option: "
   read opt
   case $opt in
 		1) FRAME_WORKS_INS ;;
-		2) DIR_SETUP ;;
 		3) KITCHEN_ LOGS ;;
 		4) ABOUT_OPT ;;
 		10) MAIN_MENU ;;
 		*) echo "Invalid option"; continue;;
 	esac
 done
-}
-
-## Directory Setup ##
-DIR_SETUP() {
-		clear
-		PRINT_BANNER
-			mkdir "$APKKITCH"
-		echo "***********************************************************************************"
-		echo "*                                                                                 *"
-		echo "*                          Creating editing folder                                *"
-		echo "*                                                                                 *"
-		echo "***********************************************************************************"
-			mkdir "$APKKITCH/editing"
-		echo "***********************************************************************************"
-		echo "*                                                                                 *"
-		echo "*                     Creating place input file here folder                       *"
-		echo "*                                                                                 *"
-		echo "***********************************************************************************"
-			mkdir "$APKKITCH/place_input_file_here"
-		echo "***********************************************************************************"
-		echo "*                                                                                 *"
-		echo "*                     Creating place apk here to sign folder                      *"
-		echo "*                                                                                 *"
-		echo "***********************************************************************************"
-			mkdir "$APKKITCH/place_apk_here_to_sign"
-		echo "***********************************************************************************"
-		echo "*                                                                                 *"
-		echo "*                       Creating batch_optimize folder                            *"
-		echo "*                                                                                 *"
-		echo "***********************************************************************************"
-			mkdir "$APKKITCH/batch_optimize"
-		echo "***********************************************************************************"
-		echo "*                                                                                 *"
-		echo "*                         DIRECTORY BUILD COMPLETE                                *"
-		echo "*                                                                                 *"
-		echo "***********************************************************************************"
-	read -p "Directory Setup Finished, Enter To Return"
 }
 
 ## Frameworks Install Menu ##
@@ -2312,8 +2268,15 @@ else
 	rm -f Bong.ln.test
 fi
 
-# Create our temporary directory
+## Create our required directories ##
+mkdir -p "$APKKITCH"
+mkdir -p "$RKITCH"
 mkdir -p "$TEMPDIR"
+mkdir -p "$APKKITCH/editing"
+mkdir -p "$APKKITCH/place_input_file_here"
+mkdir -p "$APKKITCH/place_apk_here_to_sign"
+mkdir -p "$APKKITCH/batch_optimize"
+mkdir -p "$RKITCH/base_files"
 
 ## Test for Tools And Throw Error If Any Missing ##
 ERROR="0"
