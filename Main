@@ -119,7 +119,7 @@ done
 
 #####################################################################################
 #
-#                                                  Bongs Rom Tools Below
+# #                                                   Bongs Rom Tools Below
 #####################################################################################
 
 ## Rom Main Menu ##
@@ -137,7 +137,7 @@ echo -e "                                                                       
 echo -e "   1    Create New Build                      2    Select Exsisting Project                             Current Project:\e[1m$ACTIVE_BUILD\e[0m"
 echo -e "                                                                                                        Rom Device: \e[1m$DevT\e[0m"
 echo -e "   3    Enable/Disable Root                   7    Bloat/Debloat ROM                                    Knox State: \e[1m$knoxst\e[0m"
-echo -e "                                                                                                        Root State: \e[1m\e[0m"
+echo -e "                                                                                                        Root State: \e[1m$rmsupsu\e[0m"
 echo -e "   4    Enable/Disable Busybox                8    Zipalign Everything                                  BusyBox State: \e[1m\e[0m"
 echo -e "                                                                                                        Bloat State: \e[1m\e[0m"
 echo -e "   5    Enable/Disable Init.d                 9    Deodex Everything                                    Odex State: \e[1m$rmodexst\e[0m"
@@ -175,6 +175,7 @@ echo -n "   Enter option: "
     case $opt in
 		1) CREATE_NEW_BUILD;;
 		2) SELECT_OLD_BUILD;;
+		3) ADD_REMOVE_ROOT;;
 		MM|mm) BASE_MENU;;
 		99) clear; EXIT_OUT;;
 		*)
@@ -325,10 +326,10 @@ cd $RKITCH/base_files
 clear
 	echo "To create a ROM from stock partition images, make sure that you have:"
 	echo
-	echo "[REQUIRED] system.img - Partition image for /system partition"
-	echo "[REQUIRED] boot.img - Raw kernel image for boot block"
-	echo "[OPTIONAL] cache.img - Partition image for /cache partition"
-	echo "[OPTIONAL] modem.bin - Raw modem image for modem block"
+	echo "[REQUIRED] system.img or system.img.ext4"
+	echo "[REQUIRED] boot.img"
+	echo "[OPTIONAL] cache.img or cache.img.ext4"
+	echo "[OPTIONAL] modem.bin"
 	echo
 	echo "Please notice that some ROMs may have other requirements, for example having cache.img as mandatory and not optional"
 
@@ -388,7 +389,7 @@ clear
 
 	## SYSTEM ##
 	cp "$SYSTEM" "$RKITCH/$ACTIVE_BUILD/system.img"
-	MOUNT_IMG "$RKITCH/$ACTIVE_BUILD/system.img" "/tmp/BongsMultiKitchenLOOP" || (DEL_PROJECT; return 1)
+	MOUNT_IMG "$RKITCH/$ACTIVE_BUILD/system.img" "/tmp/BongsMultiKitchenLOOP"
 	echo "Extracting everything from mounted system partition..."
 	OBTAIN_ROOT "cp -R /tmp/BongsMultiKitchenLOOP/* $RKITCH/$ACTIVE_BUILD/system/"
 	OBTAIN_ROOT "umount /tmp/BongsMultiKitchenLOOP"
@@ -552,7 +553,7 @@ BUILD_META_INF() {
 	done
 }
 
-## Merges updater-scripts from $1 to our ACTIVE_BUILD ##
+## Merges updater-scripts from $1 to our ACTIVE_PROJECT ##
 UPDATER_SCRIPT_ADD() {
 	local FOLDER="$1"
 	local FILE=""
@@ -567,14 +568,19 @@ UPDATER_SCRIPT_ADD() {
 	done
 }
 
-## Reverts merge of updater-scripts from $1 in our ACTIVE_BUILD ##
+## Reverts merge of updater-scripts from $1 in our ACTIVE_PROJECT ##
 UPDATER_SCRIPT_DEL() {
 	local FOLDER="$1"
 	local FILE=""
 	for UPDATER_SCRIPT in "$FOLDER/updater-script-"*; do
 		FILE="$(basename "$UPDATER_SCRIPT")"
 		echo -n "" > "$RKITCH/$ACTIVE_BUILD/$FILE"
-			sed '/$UPDATER_SCRIPT/d' ./$RKITCH/$ACTIVE_BUILD/$FILE > $RKITCH/$ACTIVE_BUILD/$META_INF/$FILE
+		while read line; do
+			if [[ "$(grep -q "$line" "$UPDATER_SCRIPT"; echo $?)" -eq 1 ]]; then
+				echo "$line" >> "$RKITCH/$ACTIVE_BUILD/$FILE"
+			fi
+		done < "$RKITCH/$ACTIVE_BUILD/$META_INF/$FILE"
+		mv -f "$RKITCH/$ACTIVE_BUILD/$FILE" "$RKITCH/$ACTIVE_BUILD/$META_INF/$FILE"
 	done
 }
 
@@ -593,6 +599,21 @@ BUILD_UPDATER_SCRIPT() {
 	done
 	sed -i '/^$/d' "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script" # This removes safety lines added above
 	GREP_DELETE_WORD "/tmp/invalid" "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script" "^" # This is to ensure that we won't pollute our updater-script with invalid paths for kernel or modem
+}
+
+## Adds or removes root ##
+ADD_REMOVE_ROOT() {
+	if [[ ! -d "$RKITCH/$ACTIVE_BUILD/extra/supersu" ]]; then
+		mkdir -p "$RKITCH/$ACTIVE_BUILD/extra"
+		cp -R $current/tools/SuperSU/* "$RKITCH/$ACTIVE_BUILD/extra/"
+		UPDATER_SCRIPT_ADD "$current/tools/updater_scripts/SU-scripts"
+	else
+		rm -rf "$RKITCH/$ACTIVE_BUILD/extra/supersu"
+		rm -rf "$RKITCH/$ACTIVE_BUILD/extra/install_su.sh"
+		UPDATER_SCRIPT_DEL "$current/tools/updater_scripts/SU-scripts"
+	fi
+	BUILD_UPDATER_SCRIPT
+	ROM_MAIN_MENU
 }
 
 ## Prints status of the Build ##
@@ -635,6 +656,7 @@ if [[ -z "$ACTIVE_BUILD" ]]; then
 	export knoxst=""
 	export rmodexst=""
 	rmapi=""
+	export rmsupsu=""
 	else
 	export DevT="$(grep -i "ro.product.model=" "$RKITCH/$ACTIVE_BUILD/system/build.prop" | head -n 1 | cut -d'=' -f2)"
 	
@@ -651,6 +673,13 @@ if [[ -z "$ACTIVE_BUILD" ]]; then
 	else
 		export rmodexst="Deodexed"
 	fi
+	
+	if [[ ! -d "$RKITCH/$ACTIVE_BUILD/extra/supersu" ]] && [[ ! -f "$RKITCH/$ACTIVE_BUILD/extra/supersu/install_su.sh" ]]; then
+		export rmsupsu="Not Rooted"
+	else
+		export rmsupsu="Rooted"
+	fi
+	
 fi
 }
 
