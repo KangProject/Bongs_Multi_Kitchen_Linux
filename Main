@@ -552,7 +552,7 @@ BUILD_META_INF() {
 	done
 }
 
-# Merges updater-scripts from $1 to our ACTIVE_PROJECT
+## Merges updater-scripts from $1 to our ACTIVE_BUILD ##
 UPDATER_SCRIPT_ADD() {
 	local FOLDER="$1"
 	local FILE=""
@@ -567,7 +567,7 @@ UPDATER_SCRIPT_ADD() {
 	done
 }
 
-# Reverts merge of updater-scripts from $1 in our ACTIVE_PROJECT
+## Reverts merge of updater-scripts from $1 in our ACTIVE_BUILD ##
 UPDATER_SCRIPT_DEL() {
 	local FOLDER="$1"
 	local FILE=""
@@ -578,7 +578,7 @@ UPDATER_SCRIPT_DEL() {
 	done
 }
 
-# Builds final updater-script from our segments
+## Builds final updater-script from our segments ##
 BUILD_UPDATER_SCRIPT() {
 	local HEADER=""
 	echo -n "" > "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script"
