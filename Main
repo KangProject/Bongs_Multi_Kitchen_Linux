@@ -126,6 +126,7 @@ done
 ROM_MAIN_MENU() {
 while :; do
 clear
+PRINT_ROM_VARS
 PRINT_ROM_BUILD_STATUS
 echo -e "   -------------------------------------------------------------------------------------------------------------------------------------------------"
 echo -e "   MM. To Main Menu                               \e[93mBONGS ROM KITCHEN\e[0m                       "
@@ -140,7 +141,7 @@ echo -e "                                                                       
 echo -e "   4    Enable/Disable Busybox                8    Zipalign Everything                                  BusyBox State: \e[1m\e[0m"
 echo -e "                                                                                                        Bloat State: \e[1m\e[0m"
 echo -e "   5    Enable/Disable Init.d                 9    Deodex Everything                                    Odex State: \e[1m$rmodexst\e[0m"
-echo -e 
+echo -e "                                                                                                        Rom API: \e[1m$rmapi\e[0m"
 echo -e "   6    Remove KNOX"
 echo -e
 echo -e "   -----------------"
@@ -182,6 +183,26 @@ echo -n "   Enter option: "
 		;;
     esac
 done
+}
+
+## Changes matching word to another one ##
+SED_CHANGES() {
+	# $1 - What we're changing
+	# $2 - To what we're changing
+	# $3 - File location for that
+	# $4 - Unique delimiter (optional)
+	if [[ -z "$4" ]]; then
+		sed -i 's/'"$1"'/'"$2"'/g' "$3"
+	else
+		sed -i 's'"$4""$1""$4""$2""$4"'g' "$3"
+	fi
+}
+
+# Removes all lines which match the word
+GREP_DELETE_WORD() {
+	# $1 - What we're deleting
+	# $2 - File location for that
+	grep -v "$1" "$2" > "$2.tmp" && mv -f "$2.tmp" "$2"
 }
 
 ## Tries to mount chosen file ##
@@ -402,11 +423,14 @@ clear
 	## Generate required files ##
 	rm -rf "$RKITCH/$ACTIVE_BUILD/META-INF" # In case we have any bloat from sec_csc.zip or similar
 	BUILD_META_INF
+	BUILD_UPDATER_SCRIPT
 	read -p "Press ENTER to continue"
+	SET_KERNEL_FOR_MODEL
+	SET_MODEM_FOR_MODEL
 cd $RKITCH
 }
 
-## Sets old project as active one ##
+## Sets old build as current one ##
 SELECT_OLD_BUILD() {
 cd $RKITCH
 	echo "Select Exsisting Build To Edit.."
@@ -417,6 +441,106 @@ cd $RKITCH
 			break
 		done
 		ACTIVE_BUILD=$exbuild
+	ROM_MAIN_MENU
+}
+
+## Sets model kernel ##
+SET_KERNEL_FOR_MODEL() {
+	clear
+	if [[ -f "$RKITCH/$ACTIVE_BUILD/boot.img" ]] && ([[ "$(grep -qi "boot.img" "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script"; echo $?)" -ne 0 || "$(grep -qi "/tmp/invalid_kernel_path" "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script"; echo $?)" -eq 0 ]]); then
+		echo "WARNING! Kernel has been found but there's no path in the current updater-script"
+		echo "This is typical when you're converting stock image partition to ZIP-flashable ROM"
+		local DevT="$(grep -i "ro.product.model=" "$RKITCH/$ACTIVE_BUILD/system/build.prop" | head -n 1 | cut -d'=' -f2)"
+		local rmapi="$(grep -i "ro.build.version.sdk=" "$RKITCH/$ACTIVE_BUILD/system/build.prop" | head -n 1 | cut -d'=' -f2)"
+		if [[ -z "$DevT" ]]; then
+			echo "ERROR: Could not detect ROM model, setting of kernel failed"
+			read -p "Press ENTER to continue"
+			return 1
+		fi
+		if [[ -z "$rmapi" ]]; then
+			echo "ERROR: Could not detect ROM api, setting of kernel failed"
+			read -p "Press ENTER to continue"
+			return 1
+		fi
+		echo
+		echo "Detected ROM Model: $DevT		ROM API: $rmapi"
+		if [[ -f "$DEVICES/$DevT/$rmapi/KERNEL" ]]; then
+			KERNELPATH="$(cat "$DEVICES/$DevT/$rmapi/KERNEL")"
+			echo "Based on detected ROM model and our little database, your kernel path should be: $KERNELPATH"
+		else
+			echo "This model does not yet exist in our database. Please fill your kernel path manually"
+			echo
+			echo "Example for I9300/m0 (Samsung Galaxy S3): /dev/block/mmcblk0p5"
+			echo "Example for N9005/hlte (Samsung Note 3): /dev/block/platform/msm_sdcc.1/by-name/boot"
+			echo "Example for E960/mako (LG Nexus 4): /dev/block/platform/msm_sdcc.1/by-name/boot"
+			echo
+			echo "MAKE SURE THAT THE PATH IS CORRECT, OVERWRITING WRONG PATHS MAY LEAD TO SOFT AND HARD BRICKS"
+			read -p "Kernel path for your device: " KERNELPATH
+		fi
+		SED_CHANGES "/tmp/invalid_kernel_path" "$KERNELPATH" "$RKITCH/$ACTIVE_BUILD/$META_INF/$UPDATER_SCRIPT_KERNEL" "^"
+		echo
+		echo "The final effect is:"
+		echo "=-=-=-=-=-=-=-=-="
+		cat "$RKITCH/$ACTIVE_BUILD/$META_INF/$UPDATER_SCRIPT_KERNEL"
+		echo
+		echo "=-=-=-=-=-=-=-=-="
+		echo "Make sure that the command is correct"
+		echo "If you need to apply any changes to the generated command, please edit $RKITCH/$ACTIVE_BUILD/$META_INF/$UPDATER_SCRIPT_KERNEL before going to the next step"
+		read -p "Press ENTER to continue"
+	fi
+	clear
+}
+
+## Sets model modem ##
+SET_MODEM_FOR_MODEL() {
+	if [[ -f "$RKITCH/$ACTIVE_BUILD/modem.bin" ]] && ([[ "$(grep -qi "modem.bin" "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script"; echo $?)" -ne 0 || "$(grep -qi "/tmp/invalid_modem_path" "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script"; echo $?)" -eq 0 ]]); then
+		echo "WARNING! Modem has been found but there's no path in the current updater-script"
+		echo "This is typical when you're converting stock image partition to ZIP-flashable ROM"
+		local DevT="$(grep -i "ro.product.model=" "$RKITCH/$ACTIVE_BUILD/system/build.prop" | head -n 1 | cut -d'=' -f2)"
+		local rmapi="$(grep -i "ro.build.version.sdk=" "$RKITCH/$ACTIVE_BUILD/system/build.prop" | head -n 1 | cut -d'=' -f2)"
+		if [[ -z "$DevT" ]]; then
+			echo "ERROR: Could not detect ROM model, setting of modem failed"
+			read -p "Press ENTER to continue"
+			return 1
+		fi
+		if [[ -z "$rmapi" ]]; then
+			echo "ERROR: Could not detect ROM api, setting of modem failed"
+			read -p "Press ENTER to continue"
+			return 1
+		fi
+		echo
+		echo "Detected ROM Model: $DevT		ROM API: $rmapi"
+		if [[ -f "$DEVICES/$DevT/$rmapi/MODEM" ]]; then
+			MODEMPATH="$(cat "$DEVICES/$DevT/$rmapi/MODEM")"
+			echo "Based on detected ROM model and our little database, your modem path should be: $MODEMPATH"
+		else
+			echo "This model does not yet exist in our database. Please fill your modem path manually"
+			echo "Please notice that some models are not supporting flashing a modem via recovery, in such case you should use generic 'NULL' word in this question"
+			echo
+			echo "Example for I9300/m0 (Samsung Galaxy S3): /dev/block/mmcblk0p7"
+			echo "Example for N9005/hlte (Samsung Note 3): NULL"
+			echo "Example for E960/mako (LG Nexus 4): /dev/block/platform/msm_sdcc.1/by-name/modem"
+			echo
+			echo "MAKE SURE THAT THE PATH IS CORRECT, OVERWRITING WRONG PATHS MAY LEAD TO SOFT AND HARD BRICKS"
+			read -p "Modem path for your device: " MODEMPATH
+		fi
+		if [[ "$MODEMPATH" = "NULL" ]]; then
+			echo "It looks like your device does not support flashing a modem through recovery, your modem path is NULL"
+			rm -f "$RKITCH/$ACTIVE_BUILD/modem.bin" "$RKITCH/$ACTIVE_BUILD/$META_INF/$UPDATER_SCRIPT_MODEM"
+		else
+			SED_CHANGES "/tmp/invalid_modem_path" "$MODEMPATH" "$RKITCH/$ACTIVE_BUILD/$META_INF/$UPDATER_SCRIPT_MODEM" "^"
+			echo
+			echo "The final effect is:"
+			echo "=-=-=-=-=-=-=-=-="
+			cat "$RKITCH/$ACTIVE_BUILD/$META_INF/$UPDATER_SCRIPT_MODEM"
+			echo
+			echo "=-=-=-=-=-=-=-=-="
+			echo "Make sure that the command is correct"
+			echo "If you need to apply any changes to the generated command, please edit $ACTIVE_BUILD/$META_INF/$UPDATER_SCRIPT_MODEM before going to the next step"
+		fi
+		read -p "Press ENTER to continue"
+	fi
+	clear
 }
 
 ## Creates generic META-INF ##
@@ -426,6 +550,49 @@ BUILD_META_INF() {
 	for UPDATER_SCRIPT in "$DEVICES/base-meta/updater-scripts/"*; do
 		cp "$UPDATER_SCRIPT" "$RKITCH/$ACTIVE_BUILD/$META_INF/"
 	done
+}
+
+# Merges updater-scripts from $1 to our ACTIVE_PROJECT
+UPDATER_SCRIPT_ADD() {
+	local FOLDER="$1"
+	local FILE=""
+	for UPDATER_SCRIPT in "$FOLDER/updater-script-"*; do
+		FILE="$(basename "$UPDATER_SCRIPT")"
+		{
+			echo # This is to ensure that we have a new line BEFORE appending"
+			cat "$UPDATER_SCRIPT"
+			echo # This is to ensure that we have a new line AFTER appending"
+		} >> "$RKITCH/$ACTIVE_BUILD/$META_INF/$FILE"
+		sed -i '/^$/d' "$RKITCH/$ACTIVE_BUILD/$META_INF/$FILE" # This removes safety lines added above
+	done
+}
+
+# Reverts merge of updater-scripts from $1 in our ACTIVE_PROJECT
+UPDATER_SCRIPT_DEL() {
+	local FOLDER="$1"
+	local FILE=""
+	for UPDATER_SCRIPT in "$FOLDER/updater-script-"*; do
+		FILE="$(basename "$UPDATER_SCRIPT")"
+		echo -n "" > "$RKITCH/$ACTIVE_BUILD/$FILE"
+			sed '/$UPDATER_SCRIPT/d' ./$RKITCH/$ACTIVE_BUILD/$FILE > $RKITCH/$ACTIVE_BUILD/$META_INF/$FILE
+	done
+}
+
+# Builds final updater-script from our segments
+BUILD_UPDATER_SCRIPT() {
+	local HEADER=""
+	echo -n "" > "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script"
+	for UPDATER_SCRIPT in "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script-"*; do
+		HEADER="# $(basename "$UPDATER_SCRIPT")"
+		{
+			echo # This is to ensure that we have a new line BEFORE appending"
+			echo "$HEADER"
+			cat "$UPDATER_SCRIPT"
+			echo # This is to ensure that we have a new line AFTER appending"
+		} >> "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script"
+	done
+	sed -i '/^$/d' "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script" # This removes safety lines added above
+	GREP_DELETE_WORD "/tmp/invalid" "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script" "^" # This is to ensure that we won't pollute our updater-script with invalid paths for kernel or modem
 }
 
 ## Prints status of the Build ##
@@ -457,6 +624,32 @@ else
 		export rmstate="Rom OK To Build"
 	else
 		export rmstate="ERROR!! In Rom Check Warnings"
+	fi
+fi
+}
+
+## Prints status of the ROM ##
+PRINT_ROM_VARS() {
+if [[ -z "$ACTIVE_BUILD" ]]; then
+	export DevT=""
+	export knoxst=""
+	export rmodexst=""
+	rmapi=""
+	else
+	export DevT="$(grep -i "ro.product.model=" "$RKITCH/$ACTIVE_BUILD/system/build.prop" | head -n 1 | cut -d'=' -f2)"
+	
+	export rmapi="$(grep -i "ro.build.version.sdk=" "$RKITCH/$ACTIVE_BUILD/system/build.prop" | head -n 1 | cut -d'=' -f2)"
+		
+	if [[ -f "$RKITCH/$ACTIVE_BUILD/system/app/KNOXAgent/KNOXAgent.apk" ]] || [[ -f "$RKITCH/$ACTIVE_BUILD/system/app/KnoxMigrationAgent/KnoxMigrationAgent.apk" ]]; then
+		export knoxst="Knox Present"
+	else
+		export knoxst="Knox Removed"
+	fi
+		
+	if [[ -f $RKITCH/$ACTIVE_BUILD/system/framework/arm64/boot.oat ]] || [[ -f $RKITCH/$ACTIVE_BUILD/system/framework/arm/boot.oat ]] || [[ -f $RKITCH/$ACTIVE_BUILD/system/framework/x86_64/boot.oat ]] || [[ -f $RKITCH/$ACTIVE_BUILD/system/framework/x86/boot.oat ]]; then
+		export rmodexst="Odexed"
+	else
+		export rmodexst="Deodexed"
 	fi
 fi
 }

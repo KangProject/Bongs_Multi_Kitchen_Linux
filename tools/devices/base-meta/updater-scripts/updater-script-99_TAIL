@@ -1,0 +1,4 @@
+unmount("/data");
+unmount("/cache");
+unmount("/preload");
+unmount("/system");
