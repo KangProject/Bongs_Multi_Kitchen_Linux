@@ -13,7 +13,7 @@ VERSION="1.5" # ( Developers Use Only )
 XDALINK="http://forum.xda-developers.com/showthread.php?t=3176652"
 CUSER="$(whoami)"
 TOOLSDIR="$current/tools/tools"
-GITHUBLINK="https://github.com/Carloss32/Bongs_Multi_Kitchen_Linux.git"
+GITHUBLINK="https://github.com/BongOfWar/Bongs_Multi_Kitchen_Linux.git"
 AUTOUPDATE="1" # Defines if we should turn on auto updates, if available
 GITHUBBRANCH="master"
 NEEDEDGIT="1.9"
