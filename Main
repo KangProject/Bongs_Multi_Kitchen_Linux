@@ -176,6 +176,9 @@ echo -n "   Enter option: "
 		1) CREATE_NEW_BUILD;;
 		2) SELECT_OLD_BUILD;;
 		3) ADD_REMOVE_ROOT;;
+		10) KERNEL_EXTRACT;;
+		11) KERNEL_REPACK;;
+		12) KERNEL_CLEAN;;
 		MM|mm) BASE_MENU;;
 		99) clear; EXIT_OUT;;
 		*)
@@ -436,12 +439,16 @@ SELECT_OLD_BUILD() {
 cd $RKITCH
 	echo "Select Exsisting Build To Edit.."
 		PS3="Number:"
-		buildfoldarr=`ls -d  BUILD_* `
+		if buildfoldarr=`ls -d  BUILD_* `; then
 		select exbuild in $buildfoldarr
 		do
 			break
 		done
 		ACTIVE_BUILD=$exbuild
+	else
+	echo " No Previous Builds.."
+	sleep 2s
+	fi
 	ROM_MAIN_MENU
 }
 
@@ -568,12 +575,14 @@ UPDATER_SCRIPT_ADD() {
 	done
 }
 
+
+
 ## Reverts merge of updater-scripts from $1 in our ACTIVE_PROJECT ##
 UPDATER_SCRIPT_DEL() {
 	local FOLDER="$1"
 	local FILE=""
-	for UPDATER_SCRIPT in "$FOLDER/updater-script-"*; do
-		FILE="$(basename "$UPDATER_SCRIPT")"
+	for UPDATER_SCRIPT in "$FOLDER/updater-script-"*; do 
+	FILE="$(basename "$UPDATER_SCRIPT")"
 		echo -n "" > "$RKITCH/$ACTIVE_BUILD/$FILE"
 		while read line; do
 			if [[ "$(grep -q "$line" "$UPDATER_SCRIPT"; echo $?)" -eq 1 ]]; then
@@ -613,6 +622,156 @@ ADD_REMOVE_ROOT() {
 		UPDATER_SCRIPT_DEL "$current/tools/updater_scripts/SU-scripts"
 	fi
 	BUILD_UPDATER_SCRIPT
+	ROM_MAIN_MENU
+}
+
+## Extracts the kernel ##
+KERNEL_EXTRACT() {
+	if [[ ! -d "$RKITCH/$ACTIVE_BUILD/kernel" ]]; then
+		if [[ ! -x "$TEMPDIR/mkbootimg" ]]; then
+			cd "$TOOLSDIR/mkbootimg"
+			make
+			if [[ ! -x mkbootimg || ! -x unpackbootimg ]]; then
+				echo "ERROR! Something went wrong with compilation of mkbootimg!"
+				PRESS_ENTER
+				return 1
+			fi
+			mv mkbootimg "$TEMPDIR/mkbootimg"
+			mv unpackbootimg "$TEMPDIR/unpackbootimg"
+			make clean
+		fi
+
+		if [[ ! -L "$TOOLSDIR/mtk-tools/mkbootimg" ]]; then
+			rm -f "$TOOLSDIR/mtk-tools/mkbootimg"
+			ln -s "$TEMPDIR/mkbootimg" "$TOOLSDIR/mtk-tools/mkbootimg"
+		fi
+
+		if [[ -f "$RKITCH/$ACTIVE_BUILD/boot.img" ]]; then
+			mkdir -p "$RKITCH/$ACTIVE_BUILD/kernel"
+			"$TEMPDIR/unpackbootimg" -i "$RKITCH/$ACTIVE_BUILD/boot.img" -o "$RKITCH/$ACTIVE_BUILD/kernel"
+			mkdir -p "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk"
+			if [[ -f "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk.gz" ]]; then
+				# Detect compression method
+				if [[ "$(gunzip -t "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk.gz" >/dev/null 2>&1; echo $?)" -eq 0 ]]; then
+					# GZIP
+					CBIN="gzip -9"
+					DBIN="gunzip -c"
+				elif [[ "$(lzop -t "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk.gz" >/dev/null 2>&1; echo $?)" -eq 0 ]]; then
+					# LZO
+					CBIN="lzop -9"
+					DBIN="lzop -dc"
+				elif [[ "$(xz -t "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk.gz" >/dev/null 2>&1; echo $?)" -eq 0 ]]; then
+					# XZ
+					CBIN="xz -9"
+					DBIN="xz -dc"
+				elif [[ "$(lzma -t "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk.gz" >/dev/null 2>&1; echo $?)" -eq 0 ]]; then
+					# LZMA
+					CBIN="lzma -9"
+					DBIN="lzma -dc"
+				else
+					echo "WARNING: Could not detect any known format of the ramdisk!"
+					KERNEL_CLEAN
+					echo "INFO: Trying to unpack the kernel as MTK..."
+					mkdir -p "$RKITCH/$ACTIVE_BUILD/kernel"
+					cd "$RKITCH/$ACTIVE_BUILD/kernel"
+					local MTK_PROBE="$($TOOLSDIR/mtk-$TOOLSDIR/unpack-MTK.pl "$RKITCH/$ACTIVE_BUILD/boot.img" >/dev/null 2>&1; echo $?)"
+					cd $RKITCH
+					if [[ "$MTK_PROBE" -eq 0 ]]; then
+						echo "INFO: Success!"
+						CBIN="mtk"
+						DBIN="mtk"
+					else
+						echo "ERROR: Could not find any valid method to unpack this kernel. Either it's not valid, or BongsMultiKitchen can't find out how to deal with it"
+						KERNEL_CLEAN
+						PRESS_ENTER
+						return 1
+					fi
+				fi
+				echo "$CBIN" > "$RKITCH/$ACTIVE_BUILD/kernel/Bongs-Kitchen-compression-method"
+				if [[ "$CBIN" != "mtk" && "$DBIN" != "mtk" ]]; then
+					cd "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk"
+					$DBIN $RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk.gz | cpio -i
+					cd $RKITCH
+				fi
+			fi
+		else
+			echo "ERROR: No kernel could be found!"
+			read -p "Press ENTER to continue"
+			return 1
+		fi
+	fi
+	ROM_MAIN_MENU
+}
+
+## Repacks the kernel back to boot.img ##
+KERNEL_REPACK() {
+	local EXTRA=()
+	if [[ -d "$RKITCH/$ACTIVE_BUILD/kernel" ]]; then
+		if [[ -d "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk" ]]; then
+			if [[ -z "$CBIN" && -f "$RKITCH/$ACTIVE_BUILD/kernel/Bongs-Kitchen-compression-method" ]]; then
+				CBIN="$(cat "$RKITCH/$ACTIVE_BUILD/kernel/Bongs-Kitchen-compression-method")"
+			elif [[ -z "$CBIN" ]]; then
+				echo "ERROR: Can't decide which compression method to use!"
+				KERNEL_CLEAN
+				read -p "Press ENTER to continue"
+				return 1
+			fi
+			local SUCCESS=1
+			if [[ "$CBIN" != "mtk" ]]; then
+				cd "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk"
+				find . | cpio -o -H newc | $CBIN > ../boot.img-ramdisk-NEW.gz
+				cd $RKITCH
+				if [[ -f "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-dtb" ]]; then
+					EXTRA+=(--dt "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-dtb")
+				fi
+				SUCCESS="$(
+					"$TEMPDIR/mkbootimg" --kernel "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-zImage" \
+					--ramdisk "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdisk-NEW.gz" \
+					--base "$(cat "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-base")" \
+					--cmdline "$(cat "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-cmdline")" \
+					--kernel_offset "$(cat "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-kerneloff")" \
+					--pagesize "$(cat "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-pagesize")" \
+					--ramdisk_offset "$(cat "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-ramdiskoff")" \
+					--tags_offset "$(cat "$RKITCH/$ACTIVE_BUILD/kernel/boot.img-tagsoff")" \
+					"${EXTRA[@]}" \
+					-o "$RKITCH/$ACTIVE_BUILD/kernel/temp.img" >/dev/null 2>&1
+					echo $?
+				)"
+			else
+				cd "$RKITCH/$ACTIVE_BUILD/kernel"
+				SUCCESS="$(
+					$TOOLSDIR/mtk-tools/repack-MTK.pl -boot \
+					boot.img-kernel.img \
+					boot.img-ramdisk \
+					temp.img >/dev/null 2>&1
+					echo $?
+				)"
+				cd $RKITCH
+			fi
+			if [[ "$SUCCESS" -eq 0 ]]; then
+				mv "$RKITCH/$ACTIVE_BUILD/kernel/temp.img" "$RKITCH/$ACTIVE_PROJECT/boot.img"
+				KERNEL_CLEAN # This is actually used for cleaning only
+				return 0
+			else
+				echo "ERROR: Something went wrong! Error code: $SUCCESS"
+				KERNEL_CLEAN
+				read -p "Press ENTER to continue"
+				return 1
+			fi
+		else
+			echo "ERROR: Could not find the ramdisk!"
+			KERNEL_CLEAN
+			read -p "Press ENTER to continue"
+			return 1
+		fi
+	fi
+	ROM_MAIN_MENU
+}
+
+## Aborts kernel repacking - performs cleaning ##
+KERNEL_CLEAN() {
+	rm -rf "$RKITCH/$ACTIVE_BUILD/kernel"
+	rm -f "$RKITCH/$ACTIVE_BUILD/temp.img"
 	ROM_MAIN_MENU
 }
 
