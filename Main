@@ -168,7 +168,7 @@ echo -e "   Build Options."
 echo -e "   -----------------"
 echo -e "   15  Build ROM (normal suggested mode)"
 echo -e "   16  Build ROM (expert mode, won't perform any checks on your project ( CAUTION!! ))                                 99   Close"
-echo -e ""
+echo -e "   20  Select Exsisting Build To Delete."
 echo -e "   -------------------------------------------------------------------------------------------------------------------------------------------------"
 echo -n "   Enter option: "
   read opt
@@ -179,6 +179,7 @@ echo -n "   Enter option: "
 		10) KERNEL_EXTRACT;;
 		11) KERNEL_REPACK;;
 		12) KERNEL_CLEAN;;
+		20) DEL_ACT_BUILD;;
 		MM|mm) BASE_MENU;;
 		99) clear; EXIT_OUT;;
 		*)
@@ -255,6 +256,26 @@ MOUNT_IMG() {
 	return 1
 }
 
+## Select, Set and Remove ACTIVE_BUILD ##
+DEL_ACT_BUILD() {
+cd $RKITCH
+	echo "Select Exsisting Build To Edit.."
+		PS3="Number:"
+		if buildfoldarr=`ls -d  BUILD_* `; then
+		select exbuild in $buildfoldarr
+		do
+			break
+		done
+		ACTIVE_BUILD=$exbuild
+		echo "Cleaning $ACTIVE_BUILD"
+		rm -rf "$RKITCH/$ACTIVE_BUILD"
+		ACTIVE_BUILD=""
+	else
+	echo " No Previous Builds.."
+	sleep 2s
+	fi
+}
+
 ## Creates new Build ##
 CREATE_NEW_BUILD() {
 	clear
@@ -263,6 +284,7 @@ CREATE_NEW_BUILD() {
 	echo "   1 Create a ZIP-flashable ROM from stock partition image(s)"
 	echo "   2 Create a ZIP-flashable ROM from stock .tar file"
 	echo "   3 Create a ZIP-flashable ROM from stock .md5 file"
+	echo "   4 Create a Bare Base Build.( Create folder structure )"
 	echo
 	echo -n "   Enter option: "
 	 read opt
@@ -270,10 +292,20 @@ CREATE_NEW_BUILD() {
 		1) NEW_BUILD_STOCK;;
 		2) NEW_BUILD_TAR;;
 		3) NEW_BUILD_MD5;;
+		4) NEW_BUILD_BARE;;
 		*)
 			echo "Unknown command: '$opt'"
 		;;
      esac
+}
+
+## Creates a new bare based build ##
+NEW_BUILD_BARE() {
+	ACTIVE_BUILD="BUILD_"
+	ACTIVE_BUILD+="$(date '+%d%m%y_%H%M%S')"
+	mkdir -p "$RKITCH/$ACTIVE_BUILD/system"
+	BUILD_META_INF
+	BUILD_UPDATER_SCRIPT
 }
 
 ## Extracts files from stock .md5 file for use ##
@@ -749,7 +781,7 @@ KERNEL_REPACK() {
 				cd $RKITCH
 			fi
 			if [[ "$SUCCESS" -eq 0 ]]; then
-				mv "$RKITCH/$ACTIVE_BUILD/kernel/temp.img" "$RKITCH/$ACTIVE_PROJECT/boot.img"
+				mv "$RKITCH/$ACTIVE_BUILD/kernel/temp.img" "$RKITCH/$ACTIVE_BUILD/boot.img"
 				KERNEL_CLEAN # This is actually used for cleaning only
 				return 0
 			else
