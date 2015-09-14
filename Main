@@ -610,7 +610,7 @@ UPDATER_SCRIPT_ADD() {
 
 
 ## Reverts merge of updater-scripts from $1 in our ACTIVE_PROJECT ##
-UPDATER_SCRIPT_DEL() {
+UPDATER_SCRIPT_DEL2() {
 	local FOLDER="$1"
 	local FILE=""
 	for UPDATER_SCRIPT in "$FOLDER/updater-script-"*; do 
@@ -624,6 +624,29 @@ UPDATER_SCRIPT_DEL() {
 		mv -f "$RKITCH/$ACTIVE_BUILD/$FILE" "$RKITCH/$ACTIVE_BUILD/$META_INF/$FILE"
 	done
 }
+
+## Reverts merge of updater-scripts ## Test sed function. ##
+UPDATER_SCRIPT_DEL() {
+	local FOLDER="$1"
+	local FILE=""
+	varb=""
+	# calls remover files #
+	for UPDATER_SCRIPT in "$FOLDER/remove-updater-script-"*; do 
+	FILE="$(basename "$UPDATER_SCRIPT")"
+		# cat file contents to variable #
+		varb=`cat $FOLDER/$FILE`
+		echo "$varb"
+		export vara="$varb"
+		sleep 0.25s
+		# find main updater script #
+	while read "$vara"; do
+	# remove text in $vara from updater script #
+	sed -s "/$vara/d" "$RKITCH/$ACTIVE_BUILD/$META_INF/updater-script" > "$RKITCH/$ACTIVE_BUILD/updater-script"
+	done
+	done
+}
+
+
 
 ## Builds final updater-script from our segments ##
 BUILD_UPDATER_SCRIPT() {

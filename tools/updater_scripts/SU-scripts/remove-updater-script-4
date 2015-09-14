@@ -1,0 +1,1 @@
+delete("\/tmp\/install_su.sh");
